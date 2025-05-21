@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thirdweb Engine vs. Traditional Demo</title>
+    <script src="./node_modules/chart.js/dist/chart.umd.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Thirdweb Engine vs. Traditional Approach</h1>
+
+        <div class="controls">
+            <label for="numTransactions">Transactions:</label>
+            <input type="number" id="numTransactions" value="10" min="1" max="200">
+            <button id="runTraditional">Run Traditional <div class="loader" id="loaderTraditional"></div></button>
+            <button id="runEngine">Run Engine <div class="loader" id="loaderEngine"></div></button>
+            <button id="runBoth">Run Both <div class="loader" id="loaderBoth"></div></button>
+        </div>
+
+        <div class="results-area">
+            <div class="result-box" id="traditionalResultsBox">
+                <h3>Traditional Approach</h3>
+                <p><strong>Status:</strong> <span id="traditionalStatus">Idle</span></p>
+                <p><strong>Total Server Time (incl. 1st confirmation):</strong> <span id="traditionalOverallTime">-</span> seconds</p>
+                <div class="metrics-details">
+                    <p><span>Time to get all hashes:</span> <span><span id="traditionalTimeToHashes">-</span> s</span></p>
+                    <p><span>Avg. time/tx (to get hash):</span> <span><span id="traditionalAvgHashTime">-</span> ms</span></p>
+                    <p><span>First Tx confirmed:</span> <span><span id="traditionalFirstTxConfirmed">-</span></span></p>
+                    <p><span>Time for 1st confirmation:</span> <span><span id="traditionalFirstTxConfirmTime">-</span> s (after hash received)</span></p>
+                </div>
+                <div class="gas-info metrics-details">
+                    <p><span><strong>Total Estimated Gas Cost:</strong></span> <span><span id="traditionalTotalGas">-</span> ETH</span></p>
+                    <p><span><strong>Avg. Estimated Gas Cost per Tx:</strong></span> <span><span id="traditionalAvgGas">-</span> ETH</span></p>
+                </div>
+                <p><strong>Transactions Sent (<span id="traditionalTxCount">0</span> / <span id="traditionalTxAttempted">0</span>):</strong></p>
+                <ul id="traditionalTxList"></ul>
+            </div>
+            <div class="result-box" id="engineResultsBox">
+                <h3>Engine Approach</h3>
+                <p><strong>Status:</strong> <span id="engineStatus">Idle</span></p>
+                <p><strong>Pure Transaction Queuing Time:</strong> <span id="engineOverallTime">-</span> seconds</p>
+                 <div class="metrics-details">
+                    <p><span>Avg. time/tx (enqueue only):</span> <span><span id="engineAvgQueueTime">-</span> ms</span></p>
+                </div>
+                <div class="gas-info metrics-details" id="engineGasCostSection">
+                    <p><span><strong>Gas Cost:</strong></span> <span id="engineGasCost">Sponsored by Engine</span></p>
+                </div>
+                <p><strong>Transactions Enqueued (<span id="engineTxCount">0</span> / <span id="engineTxAttempted">0</span>):</strong></p>
+                <ul id="engineTxList"></ul>
+            </div>
+        </div>
+
+        <div class="charts-area">
+            <div class="chart-container">
+                <h2>Transaction Throughput</h2>
+                <p class="chart-subtitle">(Higher is better - transactions per second your API can handle)</p>
+                <canvas id="totalTimeChart" class="chart-canvas"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>API Response Time</h2>
+                 <p class="chart-subtitle">(Time your frontend waits for a response from your backend)</p>
+                <canvas id="frontendWaitTimeChart" class="chart-canvas"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>Estimated Gas Costs</h2>
+                <p class="chart-subtitle">(Traditional: Paid by sender | Engine: Sponsored, free for caller)</p>
+                <canvas id="gasChart" class="chart-canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="summary-section">
+            <h2>Summary: Advantages & Disadvantages</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Traditional Approach</th>
+                        <th>Engine Approach</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Backend API Response Time</strong></td>
+                        <td>Slower (waits for hashes + confirmation)</td>
+                        <td>Much Faster (returns immediately after queuing)</td>
+                    </tr>
+                     <tr>
+                        <td><strong>Actual Tx Completion</strong></td>
+                        <td>App/Server directly waits for on-chain events</td>
+                        <td>Engine handles confirmation asynchronously</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Private Key Security</strong></td>
+                        <td>Key exposed in server environment</td>
+                        <td>Key secured in Thirdweb Vault</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Nonce Management</strong></td>
+                        <td>Manual or RPC-dependent, can be complex for concurrency</td>
+                        <td>Handled automatically by Engine</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Gas Optimization</strong></td>
+                        <td>Basic, or requires custom logic</td>
+                        <td>Advanced, built-in gas optimization</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Retries & Error Handling</strong></td>
+                        <td>Requires custom implementation for on-chain failures</td>
+                        <td>Automatic retries for queuing & on-chain, robust error handling by Engine</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Scalability</strong></td>
+                        <td>Can hit RPC limits, complex to scale, nonce issues, long-running processes</td>
+                        <td>Designed for high throughput, scales easily, short-lived API calls</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Infrastructure</strong></td>
+                        <td>Requires robust, always-on server for tx submission & waiting</td>
+                        <td>Serverless backend for transactions via Engine; your server just makes quick API calls</td>
+                    </tr>
+                     <tr>
+                        <td><strong>Developer Experience</strong></td>
+                        <td>Requires deeper blockchain knowledge (nonce, gas, retries, confirmations)</td>
+                        <td>Simpler API, abstracts complexities</td>
+                    </tr>
+                    <tr>
+                        <td><strong>User Experience (if frontend calls backend)</strong></td>
+                        <td>App may block/wait for long backend processing (incl. on-chain confirmation)</td>
+                        <td>App gets instant feedback from backend API (which queues quickly to Engine)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Gas Costs</strong></td>
+                        <td>Paid by sender (user/server), requires native currency for fees.</td>
+                        <td>Can be sponsored by Engine (gasless for end-user/caller).</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const numTransactionsInput = document.getElementById('numTransactions');
+        const runTraditionalBtn = document.getElementById('runTraditional');
+        const runEngineBtn = document.getElementById('runEngine');
+        const runBothBtn = document.getElementById('runBoth');
+
+        // Traditional UI Elements
+        const traditionalStatus = document.getElementById('traditionalStatus');
+        const traditionalOverallTime = document.getElementById('traditionalOverallTime');
+        const traditionalTimeToHashes = document.getElementById('traditionalTimeToHashes');
+        const traditionalAvgHashTime = document.getElementById('traditionalAvgHashTime');
+        const traditionalFirstTxConfirmed = document.getElementById('traditionalFirstTxConfirmed');
+        const traditionalFirstTxConfirmTime = document.getElementById('traditionalFirstTxConfirmTime');
+        const traditionalTxList = document.getElementById('traditionalTxList');
+        const traditionalTxCount = document.getElementById('traditionalTxCount');
+        const traditionalTxAttempted = document.getElementById('traditionalTxAttempted');
+        const loaderTraditional = document.getElementById('loaderTraditional');
+        const traditionalTotalGas = document.getElementById('traditionalTotalGas');
+        const traditionalAvgGas = document.getElementById('traditionalAvgGas');
+
+        // Engine UI Elements
+        const engineStatus = document.getElementById('engineStatus');
+        const engineOverallTime = document.getElementById('engineOverallTime');
+        const engineAvgQueueTime = document.getElementById('engineAvgQueueTime');
+        const engineTxList = document.getElementById('engineTxList');
+        const engineTxCount = document.getElementById('engineTxCount');
+        const engineTxAttempted = document.getElementById('engineTxAttempted');
+        const loaderEngine = document.getElementById('loaderEngine');
+        const engineGasCost = document.getElementById('engineGasCost');
+        const loaderBoth = document.getElementById('loaderBoth');
+        
+        const API_BASE_URL = 'http://localhost:3000';
+        let totalTimeChart = null;
+        let frontendWaitTimeChart = null;
+        let gasChart = null;
+
+        // Store metrics globally to update charts correctly after each run
+        let currentTraditionalMetrics = { 
+            overallTotalTimeSeconds: 0, 
+            avgTimePerTxGettingHashesMs: 0,
+            gasTotal: 0,
+            gasPerTx: 0
+        };
+        let currentEngineMetrics = { 
+            overallTotalTimeSeconds: 0, 
+            avgTimePerTxQueuingMs: 0,
+            gasTotal: 0,
+            gasPerTx: 0
+        };
+
+        function createChart(canvasId, labelX, datasets) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            return new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [labelX],
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: labelX.includes('(s)') ? 'Time (seconds)' : 
+                                     labelX.includes('ETH') ? 'ETH Value' : 'Time (ms)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.x !== null) {
+                                        if (labelX.includes('ETH')) {
+                                            label += context.parsed.x.toFixed(6) + ' ETH';
+                                        } else {
+                                            label += context.parsed.x.toFixed(3) + (labelX.includes('(s)') ? ' s' : ' ms');
+                                        }
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function initCharts() {
+            if (totalTimeChart) totalTimeChart.destroy();
+            totalTimeChart = createChart('totalTimeChart', 'Transaction Throughput (tx/sec)', [
+                {
+                    label: 'Traditional: Transactions per Second',
+                    data: [currentTraditionalMetrics.overallTotalTimeSeconds ? 10/currentTraditionalMetrics.overallTotalTimeSeconds : 0],
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    barPercentage: 0.5
+                },
+                {
+                    label: 'Engine: Transactions per Second',
+                    data: [currentEngineMetrics.overallTotalTimeSeconds ? 10/currentEngineMetrics.overallTotalTimeSeconds : 0],
+                    backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1,
+                    barPercentage: 0.5
+                }
+            ]);
+
+            if (frontendWaitTimeChart) frontendWaitTimeChart.destroy();
+            frontendWaitTimeChart = createChart('frontendWaitTimeChart', 'Time (s)', [
+                 {
+                    label: 'Traditional: Time to get hash + first confirmation',
+                    data: [currentTraditionalMetrics.overallTotalTimeSeconds || 0],
+                    backgroundColor: 'rgba(255, 159, 64, 0.7)',
+                    borderColor: 'rgba(255, 159, 64, 1)',
+                    borderWidth: 1,
+                    barPercentage: 0.5
+                },
+                {
+                    label: 'Engine: Time to queue transaction (fire & forget)',
+                    data: [currentEngineMetrics.overallTotalTimeSeconds || 0],
+                    backgroundColor: 'rgba(153, 102, 255, 0.7)',
+                    borderColor: 'rgba(153, 102, 255, 1)',
+                    borderWidth: 1,
+                    barPercentage: 0.5
+                }
+            ]);
+            
+            if (gasChart) gasChart.destroy();
+            gasChart = createChart('gasChart', 'Gas Costs (ETH)', [
+                {
+                    label: 'Traditional - Total ETH',
+                    data: [parseFloat(currentTraditionalMetrics.gasTotal) || 0],
+                    backgroundColor: 'rgba(231, 76, 60, 0.7)',
+                    borderColor: 'rgba(231, 76, 60, 1)',
+                    borderWidth: 1,
+                    barPercentage: 0.5
+                },
+                {
+                    label: 'Traditional - Per Tx ETH',
+                    data: [parseFloat(currentTraditionalMetrics.gasPerTx) || 0],
+                    backgroundColor: 'rgba(243, 156, 18, 0.7)',
+                    borderColor: 'rgba(243, 156, 18, 1)',
+                    borderWidth: 1,
+                    barPercentage: 0.5
+                },
+                {
+                    label: 'Engine - Total ETH (Sponsored)',
+                    data: [0],
+                    backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                    borderColor: 'rgba(46, 204, 113, 1)',
+                    borderWidth: 1,
+                    barPercentage: 0.5
+                },
+                {
+                    label: 'Engine - Per Tx ETH (Sponsored)',
+                    data: [0],
+                    backgroundColor: 'rgba(26, 188, 156, 0.7)',
+                    borderColor: 'rgba(26, 188, 156, 1)',
+                    borderWidth: 1,
+                    barPercentage: 0.5
+                }
+            ]);
+        }
+
+        function updateCharts() {
+            if (!totalTimeChart || !frontendWaitTimeChart || !gasChart) initCharts();
+            
+            totalTimeChart.data.datasets[0].data = [currentTraditionalMetrics.overallTotalTimeSeconds ? 10/currentTraditionalMetrics.overallTotalTimeSeconds : 0];
+            totalTimeChart.data.datasets[1].data = [currentEngineMetrics.overallTotalTimeSeconds ? 10/currentEngineMetrics.overallTotalTimeSeconds : 0];
+            totalTimeChart.update();
+
+            frontendWaitTimeChart.data.datasets[0].data = [currentTraditionalMetrics.overallTotalTimeSeconds || 0];
+            frontendWaitTimeChart.data.datasets[1].data = [currentEngineMetrics.overallTotalTimeSeconds || 0];
+            frontendWaitTimeChart.update();
+            
+            // Update gas chart
+            gasChart.data.datasets[0].data = [parseFloat(currentTraditionalMetrics.gasTotal) || 0];
+            gasChart.data.datasets[1].data = [parseFloat(currentTraditionalMetrics.gasPerTx) || 0];
+            gasChart.data.datasets[2].data = [0]; // Engine total (always 0)
+            gasChart.data.datasets[3].data = [0]; // Engine per tx (always 0)
+            gasChart.update();
+        }
+        
+        async function runTest(approach) {
+            const numTransactions = parseInt(numTransactionsInput.value);
+            if (isNaN(numTransactions) || numTransactions <= 0) {
+                alert('Please enter a valid number of transactions.');
+                return;
+            }
+
+            let targetLoader;
+            let approachDisplay = approach;
+
+            if (approach === 'traditional') {
+                traditionalStatus.textContent = 'Processing...';
+                loaderTraditional.style.display = 'inline-block';
+                targetLoader = loaderTraditional;
+                traditionalTxList.innerHTML = '';
+                traditionalOverallTime.textContent = '-';
+                traditionalTimeToHashes.textContent = '-';
+                traditionalAvgHashTime.textContent = '-';
+                traditionalFirstTxConfirmed.textContent = '-';
+                traditionalFirstTxConfirmTime.textContent = '-';
+                traditionalTxCount.textContent = '0';
+                traditionalTxAttempted.textContent = numTransactions;
+                traditionalTotalGas.textContent = '-';
+                traditionalAvgGas.textContent = '-';
+                currentTraditionalMetrics = { 
+                    overallTotalTimeSeconds: 0, 
+                    avgTimePerTxGettingHashesMs: 0,
+                    gasTotal: 0,
+                    gasPerTx: 0
+                }; // Reset for current run
+            } else if (approach === 'engine') {
+                engineStatus.textContent = 'Processing...';
+                loaderEngine.style.display = 'inline-block';
+                targetLoader = loaderEngine;
+                engineTxList.innerHTML = '';
+                engineOverallTime.textContent = '-';
+                engineAvgQueueTime.textContent = '-';
+                engineTxCount.textContent = '0';
+                engineTxAttempted.textContent = numTransactions;
+                engineGasCost.textContent = 'Sponsored by Engine'; // Default, can be updated if API sends something else
+                currentEngineMetrics = { 
+                    overallTotalTimeSeconds: 0, 
+                    avgTimePerTxQueuingMs: 0,
+                    gasTotal: 0,
+                    gasPerTx: 0
+                }; // Reset for current run
+            } else if (approach === 'both') { // For Run Both functionality
+                traditionalStatus.textContent = 'Processing...';
+                engineStatus.textContent = 'Processing...';
+                loaderBoth.style.display = 'inline-block';
+                targetLoader = loaderBoth;
+                // Reset traditional UI
+                traditionalTxList.innerHTML = '';
+                traditionalOverallTime.textContent = '-';
+                traditionalTimeToHashes.textContent = '-';
+                traditionalAvgHashTime.textContent = '-';
+                traditionalFirstTxConfirmed.textContent = '-';
+                traditionalFirstTxConfirmTime.textContent = '-';
+                traditionalTxCount.textContent = '0';
+                traditionalTxAttempted.textContent = numTransactions;
+                traditionalTotalGas.textContent = '-';
+                traditionalAvgGas.textContent = '-';
+                currentTraditionalMetrics = { 
+                    overallTotalTimeSeconds: 0, 
+                    avgTimePerTxGettingHashesMs: 0,
+                    gasTotal: 0,
+                    gasPerTx: 0
+                };
+                // Reset engine UI
+                engineTxList.innerHTML = '';
+                engineOverallTime.textContent = '-';
+                engineAvgQueueTime.textContent = '-';
+                engineTxCount.textContent = '0';
+                engineTxAttempted.textContent = numTransactions;
+                engineGasCost.textContent = 'Sponsored by Engine';
+                currentEngineMetrics = { 
+                    overallTotalTimeSeconds: 0, 
+                    avgTimePerTxQueuingMs: 0,
+                    gasTotal: 0,
+                    gasPerTx: 0
+                };
+                approachDisplay = 'Traditional & Engine'; // For logging or status
+            }
+            updateCharts(); // Update chart with reset/current values before fetch
+
+            runTraditionalBtn.disabled = true;
+            runEngineBtn.disabled = true;
+            runBothBtn.disabled = true;
+
+            try {
+                if (approach === 'both') {
+                    console.log(`Running both tests for ${numTransactions} transactions.`);
+                    // Run traditional then engine, or concurrently if desired (here, sequentially for simplicity)
+                    // Wait for traditional to finish before starting engine to avoid overwhelming the UI updates or server
+                    await runSingleTest('traditional', numTransactions, loaderTraditional); 
+                    await runSingleTest('engine', numTransactions, loaderEngine);
+                    if (targetLoader) targetLoader.style.display = 'none';
+                     // Final state after both run
+                    traditionalStatus.textContent = traditionalStatus.textContent === 'Processing...' ? 'Error' : traditionalStatus.textContent;
+                    engineStatus.textContent = engineStatus.textContent === 'Processing...' ? 'Error' : engineStatus.textContent;
+
+                } else {
+                    await runSingleTest(approach, numTransactions, targetLoader);
+                }
+            } catch (error) {
+                console.error(`Error during ${approachDisplay} test:`, error);
+                if (approach === 'traditional' || approach === 'both') {
+                    traditionalStatus.textContent = 'Error in runTest';
+                }
+                if (approach === 'engine' || approach === 'both') {
+                    engineStatus.textContent = 'Error in runTest';
+                }
+            } finally {
+                if (targetLoader && approach !== 'both') targetLoader.style.display = 'none'; // Individual loaders handled by runSingleTest
+                loaderBoth.style.display = 'none'; // Always hide 'Run Both' loader
+                runTraditionalBtn.disabled = false;
+                runEngineBtn.disabled = false;
+                runBothBtn.disabled = false;
+                updateCharts();
+            }
+        }
+
+        async function runSingleTest(approach, numTransactions, loaderElement) {
+            if (loaderElement) loaderElement.style.display = 'inline-block';
+            // Disable all buttons during a single test as well
+            runTraditionalBtn.disabled = true;
+            runEngineBtn.disabled = true;
+            runBothBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/${approach}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numTransactions })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    if (approach === 'traditional') {
+                        traditionalStatus.textContent = 'Completed';
+                        traditionalOverallTime.textContent = data.metrics.overallTotalTimeSeconds.toFixed(3);
+                        traditionalTimeToHashes.textContent = data.metrics.timeToGetAllHashesSeconds.toFixed(3);
+                        traditionalAvgHashTime.textContent = data.metrics.avgTimePerTxGettingHashesMs.toFixed(3);
+                        traditionalFirstTxConfirmed.textContent = data.metrics.firstTxConfirmationDetails.confirmed ? 'Yes' : 'No (timed out)';
+                        traditionalFirstTxConfirmTime.textContent = data.metrics.firstTxConfirmationDetails.timeToConfirmSeconds.toFixed(3);
+                        traditionalTxCount.textContent = data.metrics.numTransactionsSent;
+                        if (data.metrics.estimatedGas) {
+                            traditionalTotalGas.textContent = data.metrics.estimatedGas.totalEth + ' ETH';
+                            traditionalAvgGas.textContent = data.metrics.estimatedGas.avgPerTxEth + ' ETH';
+                        } else {
+                            traditionalTotalGas.textContent = 'N/A';
+                            traditionalAvgGas.textContent = 'N/A';
+                        }
+                        currentTraditionalMetrics = {
+                            overallTotalTimeSeconds: data.metrics.overallTotalTimeSeconds,
+                            avgTimePerTxGettingHashesMs: data.metrics.avgTimePerTxGettingHashesMs,
+                            gasTotal: data.metrics.estimatedGas?.totalEth || 0,
+                            gasPerTx: data.metrics.estimatedGas?.avgPerTxEth || 0
+                        };
+                        traditionalTxList.innerHTML = ''; // Clear previous list items
+                        data.transactions.forEach(tx => {
+                            const li = document.createElement('li');
+                            li.textContent = `Tx #${tx.index}: ${tx.transactionHash.substring(0, 20)}...`;
+                            traditionalTxList.appendChild(li);
+                        });
+                    } else { // Engine
+                        engineStatus.textContent = 'Completed';
+                        engineOverallTime.textContent = data.metrics.overallTotalTimeSeconds.toFixed(3);
+                        engineAvgQueueTime.textContent = data.metrics.avgTimePerTxQueuingMs.toFixed(3);
+                        engineTxCount.textContent = data.metrics.numTransactionsEnqueued;
+                        if (data.metrics.estimatedGas && data.metrics.estimatedGas.note) {
+                            document.getElementById('engineGasCost').textContent = data.metrics.estimatedGas.note;
+                        } else {
+                            document.getElementById('engineGasCost').textContent = 'Sponsored by Engine'; // Fallback
+                        }
+                        currentEngineMetrics = {
+                            overallTotalTimeSeconds: data.metrics.timeToQueueAllSeconds || data.metrics.overallTotalTimeSeconds,
+                            avgTimePerTxQueuingMs: data.metrics.avgTimePerTxQueuingMs,
+                            gasTotal: 0, // Always 0 for Engine (sponsored)
+                            gasPerTx: 0  // Always 0 for Engine (sponsored)
+                        };
+                        engineTxList.innerHTML = ''; // Clear previous list items
+                        data.transactions.forEach(tx => {
+                            const li = document.createElement('li');
+                            li.textContent = `Tx #${tx.index}: ID ${tx.transactionId.substring(0,20)}...`;
+                            engineTxList.appendChild(li);
+                        });
+                    }
+                } else {
+                    if (approach === 'traditional') {
+                        traditionalStatus.textContent = 'Error';
+                        traditionalTxList.innerHTML = `<li>Error: ${data.error}</li>`;
+                    } else { // Engine
+                        engineStatus.textContent = 'Error';
+                        engineTxList.innerHTML = `<li>Error: ${data.error}</li>`;
+                    }
+                    if (approach === 'traditional') {
+                        currentTraditionalMetrics = { 
+                            overallTotalTimeSeconds: 0, 
+                            avgTimePerTxGettingHashesMs: 0,
+                            gasTotal: 0,
+                            gasPerTx: 0
+                        };
+                    } else {
+                        currentEngineMetrics = { 
+                            overallTotalTimeSeconds: 0, 
+                            avgTimePerTxQueuingMs: 0,
+                            gasTotal: 0,
+                            gasPerTx: 0 
+                        };
+                    }
+                }
+            } catch (error) {
+                 console.error(`Error in runSingleTest for ${approach}:`, error);
+                if (approach === 'traditional') {
+                    traditionalStatus.textContent = 'Failed to fetch';
+                    traditionalTxList.innerHTML = `<li>Fetch error: ${error.message}</li>`;
+                } else { // Engine
+                    engineStatus.textContent = 'Failed to fetch';
+                    engineTxList.innerHTML = `<li>Fetch error: ${error.message}</li>`;
+                }
+                if (approach === 'traditional') {
+                    currentTraditionalMetrics = { 
+                        overallTotalTimeSeconds: 0, 
+                        avgTimePerTxGettingHashesMs: 0,
+                        gasTotal: 0,
+                        gasPerTx: 0
+                    };
+                } else {
+                    currentEngineMetrics = { 
+                        overallTotalTimeSeconds: 0, 
+                        avgTimePerTxQueuingMs: 0,
+                        gasTotal: 0,
+                        gasPerTx: 0 
+                    };
+                }
+            } finally {
+                if (loaderElement) loaderElement.style.display = 'none';
+                // Re-enable buttons only if this is the last test in a "Run Both" sequence or a single run
+                // This is handled by the main runTest function's finally block
+                updateCharts();
+            }
+        }
+
+        runTraditionalBtn.addEventListener('click', () => runTest('traditional'));
+        runEngineBtn.addEventListener('click', () => runTest('engine'));
+        runBothBtn.addEventListener('click', () => runTest('both'));
+        
+        window.onload = initCharts;
+    </script>
+</body>
+</html> 
